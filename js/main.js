@@ -137,9 +137,11 @@ async function boot() {
   window.addEventListener('resize', () => fitBig(beat.children[0]));
   let shownKey = -1, shownHall = -2, entered = false, moreHall = null;
   // Hall V: the interview opens right on top of the museum instead of on a separate page
-  let dockHidden = false, inTalk = false, chatEl = null;
-  const openDock = (focus) => { dockHidden = false; if (!chatEl) { chatEl = renderChat({ dock: true, onClose: () => { dockHidden = true; } }); dock.append(chatEl); } if (focus) setTimeout(() => chatEl.focusInput(), 350); };
-  const openHall = (hl) => { if (hl.id === 'talk') { if (!inTalk) goHall(HALLS.indexOf(hl) + 1); openDock(true); } else ui.openSheet(hl.id); };
+  // It opens by itself on arriving in hall V, and from anywhere with the «Сұхбат» button in the top bar.
+  let dockOpen = false, inTalk = false, chatEl = null;
+  const openDock = (focus) => { dockOpen = true; if (!chatEl) { chatEl = renderChat({ dock: true, onClose: () => { dockOpen = false; } }); dock.append(chatEl); } if (focus) setTimeout(() => chatEl.focusInput(), 350); };
+  const openHall = (hl) => { if (hl.id === 'talk') openDock(true); else ui.openSheet(hl.id); };
+  $('btn-talk').addEventListener('click', () => { closeMenu(); ui.closeSheet(); if (dockOpen) dockOpen = false; else openDock(true); });
   more.addEventListener('click', () => moreHall && openHall(moreHall));
   function hud() {
     const p = museum ? museum.progress : progress();
@@ -163,13 +165,14 @@ async function boot() {
       lower.dataset.on = isEnter ? '1' : '';
       moreHall = hl && key.kind !== 'enter' ? hl : null;
       const talk = !!hl && hl.id === 'talk' && key.kind !== 'enter';
-      if (talk && !inTalk) { dockHidden = false; openDock(false); }             // arriving in the hall: the chat surfaces by itself
+      if (talk && !inTalk) openDock(false);                                   // arriving in the hall: the chat surfaces by itself
+      if (!talk && inTalk) dockOpen = false;                                 // walking on: it steps aside
       inTalk = talk;
       if (moreHall) more.textContent = `${sheetLabel(moreHall)} ↗`;
     }
     card.classList.toggle('is-on', !!card.dataset.has && dist < 0.4 && entered);
     beat.style.opacity = beat.dataset.has && entered ? String(Math.min(1, Math.max(0, 1.7 - dist / 0.24))) : '0';
-    const dockOn = inTalk && !dockHidden && entered && !ui.busy;
+    const dockOn = dockOpen && entered && !ui.busy;
     dock.classList.toggle('is-on', dockOn); document.body.classList.toggle('has-dock', dockOn);
     more.classList.toggle('is-on', !!moreHall && entered && !ui.busy && !dockOn);
     lower.style.opacity = lower.dataset.on && entered ? String(Math.min(1, Math.max(0, 1.5 - dist / 0.3))) : '0';
@@ -219,7 +222,7 @@ async function boot() {
     else if (hit.hall >= 1) openHall(HALLS[hit.hall - 1]);
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { if (!ui.escape()) closeMenu(); return; }
+    if (e.key === 'Escape') { if (!ui.escape()) { if (dockOpen) dockOpen = false; else closeMenu(); } return; }
     if (!entered || ui.busy || menu.classList.contains('is-on') || e.target.matches?.('input, textarea')) return;
     const cur = Math.round(progress() * (N - 1));
     if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); goKey(Math.min(N - 1, cur + 1)); }

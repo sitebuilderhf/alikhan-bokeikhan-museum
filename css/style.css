@@ -35,6 +35,8 @@ p { margin: 0; }
 .btn--sm { padding: .7em 1.15em; font-size: 13.5px; }
 .chip { padding: .62em 1.1em; border-radius: 999px; border: 1px solid var(--line); font: 500 13px/1 var(--text); letter-spacing: .04em; background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: border-color .2s, background .2s; }
 .chip:hover { border-color: var(--gold); background: rgba(201, 162, 95, .14); }
+.chip--talk { background: linear-gradient(180deg, #e3c88e, #b98f4b); color: #1a130b; border-color: transparent; font-weight: 600; }
+.chip--talk:hover { background: linear-gradient(180deg, #f0d9a6, #c79c56); border-color: transparent; }
 
 /* ---------- intro ---------- */
 .intro { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px;
@@ -69,13 +71,14 @@ p { margin: 0; }
 
 /* ---------- rail ---------- */
 .rail { position: fixed; right: clamp(10px, 2vw, 26px); top: 50%; transform: translateY(-50%); z-index: 20; display: grid; gap: 4px; transition: opacity .8s; }
-.rail button { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 6px 0; color: var(--cream-2); }
-.rail .lbl { font: 500 12px/1 var(--text); letter-spacing: .05em; opacity: 0; transform: translateX(8px); transition: opacity .25s, transform .25s var(--ease); white-space: nowrap;
+/* the button is only as wide as its dot: the label is positioned outside the flow so it cannot swallow clicks meant for other controls */
+.rail button { position: relative; display: block; padding: 6px 0; color: var(--cream-2); }
+.rail .lbl { position: absolute; right: 46px; top: 50%; font: 500 12px/1 var(--text); letter-spacing: .05em; opacity: 0; transform: translate(8px, -50%); transition: opacity .25s, transform .25s var(--ease); white-space: nowrap;
   background: var(--glass); padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); pointer-events: none; }
 .rail .num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 600 14px/1 var(--display); border: 1px solid transparent; transition: all .3s var(--ease); position: relative; }
 .rail .num::before { content: ""; position: absolute; inset: 12px; border-radius: 50%; background: var(--cream-2); opacity: .55; transition: all .3s var(--ease); }
 .rail .num span { opacity: 0; transition: opacity .3s; position: relative; }
-.rail button:hover .lbl, .rail button:focus-visible .lbl { opacity: 1; transform: none; }
+.rail button:hover .lbl, .rail button:focus-visible .lbl { opacity: 1; transform: translate(0, -50%); }
 .rail button:hover .num::before { opacity: 1; }
 .rail button.is-active .num { border-color: #fff; background: var(--hall, var(--gold)); color: #fff; }
 .rail button.is-active .num::before { opacity: 0; }
@@ -117,7 +120,9 @@ p { margin: 0; }
 @keyframes beat-big { from { opacity: 0; letter-spacing: .22em; filter: blur(14px) drop-shadow(0 6px 34px rgba(0, 0, 0, .7)); transform: translateY(26px); } to { opacity: 1; letter-spacing: .01em; filter: blur(0) drop-shadow(0 6px 34px rgba(0, 0, 0, .7)); transform: none; } }
 @keyframes beat-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 
-.more { position: fixed; right: clamp(58px, 6vw, 96px); bottom: clamp(190px, 27vh, 250px); z-index: 16; padding: 11px 18px; border-radius: 999px; font: 600 13px/1 var(--text); letter-spacing: .03em; color: #1a130b;
+.corner { position: fixed; right: clamp(58px, 6vw, 96px); bottom: clamp(18px, 4vh, 40px); z-index: 16; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none; }
+.corner > * { pointer-events: auto; }
+.more { position: relative; padding: 13px 20px; border-radius: 999px; font: 600 14px/1 var(--text); letter-spacing: .03em; color: #1a130b;
   background: linear-gradient(180deg, #e3c88e, #b98f4b); box-shadow: 0 10px 36px -12px rgba(201, 162, 95, .8); opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .4s, transform .4s var(--ease), visibility .4s; }
 .more.is-on { opacity: 1; visibility: visible; transform: none; }
 .more:hover { background: linear-gradient(180deg, #f0d9a6, #c79c56); }
@@ -142,7 +147,7 @@ p { margin: 0; }
 .has-dock .beat { opacity: 0 !important; }
 
 /* ---------- minimap ---------- */
-.map { position: fixed; right: clamp(58px, 6vw, 96px); bottom: clamp(18px, 4vh, 40px); z-index: 16; width: clamp(150px, 15vw, 210px); padding: 10px 10px 8px; border-radius: 14px;
+.map { position: relative; width: clamp(150px, 15vw, 210px); padding: 10px 10px 8px; border-radius: 14px;
   background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: opacity .8s; }
 .is-intro .map, .is-intro .more, .is-intro .beat { opacity: 0 !important; pointer-events: none; }
 .map.is-off { opacity: 0; pointer-events: none; }
@@ -403,7 +408,7 @@ textarea.field { width: 100%; min-height: 120px; resize: vertical; display: bloc
   .brand small { display: none; } .brand b { font-size: 18px; } .brand svg { width: 30px; height: 30px; }
   .chip { padding: .55em .9em; font-size: 12px; }
   .dock { width: calc(100vw - 16px); } .chat--dock { height: min(560px, 74vh); } .chat--dock .msg { max-width: 90%; font-size: 14.5px; } .chat--dock .chat__sug { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .chat--dock .chat__sug button { white-space: nowrap; }
-  .map { display: none; } .more { right: 44px; bottom: 18px; } .beat { padding: 16vh 44px 62px 16px; } .beat__d { font-size: 14px; }
+  .map { display: none; } .corner { right: 44px; bottom: 18px; } .beat { padding: 16vh 44px 62px 16px; } .beat__d { font-size: 14px; }
   .lower { margin-top: -160px; padding: 34px 16px 40px; } .lower__lead { display: none; } .lower::after { bottom: 20px; }
   .brand span { display: none; }
   .where { position: static; transform: none; max-width: none; margin: 0 8px; flex: 1; min-width: 0; padding: 7px 12px 7px 10px; } .where b { display: none; } .where span { font-size: 15px; }

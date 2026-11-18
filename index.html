@@ -45,6 +45,7 @@
     </button>
     <div class="where" id="where" aria-live="polite"></div>
     <div class="top__actions">
+      <button class="chip chip--talk" id="btn-talk">Сұхбат</button>
       <button class="chip" id="btn-halls">Залдар</button>
       <button class="chip" id="btn-sources">Дереккөздер</button>
     </div>
@@ -55,8 +56,11 @@
 
   <div class="lower" id="lower" aria-hidden="true"><span class="lower__num"></span><span class="lower__title"></span><span class="lower__lead"></span></div>
   <div class="beat" id="beat" aria-live="polite"><span class="beat__big"></span><span class="beat__t"></span><span class="beat__d"></span></div>
-  <button class="more" id="more" data-ui></button>
-  <div class="map" id="map" data-ui></div>
+  <!-- bottom-right stack: the action button always sits above the minimap, never under it -->
+  <div class="corner" data-ui>
+    <button class="more" id="more"></button>
+    <div class="map" id="map"></div>
+  </div>
   <aside class="dock" id="dock" data-ui aria-label="Виртуалды сұхбат"></aside>
   <section class="card" id="card" data-ui aria-live="polite"></section>
   <div class="scrollhint" id="scrollhint"><span></span>Айналдыр</div>
