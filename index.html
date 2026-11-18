@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Әлихан Бөкейханның виртуалды музейі</title>
+  <meta name="description" content="Әлихан Бөкейханның өмірі мен мұрасына арналған 3D виртуалды музей: жеті зал, тарихи құжаттар, виртуалды сұхбат және интерактивті тапсырмалар.">
+  <meta name="theme-color" content="#0c0907">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c0907'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23c9a25f' stroke-width='3'/%3E%3Cpath d='M15 32h34M32 15v34M20 20l24 24M44 20L20 44' stroke='%23c9a25f' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preload" href="assets/fonts/CormorantGaramond-600-cyrillic-ext.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/fonts.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+  { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body class="is-intro">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div id="scroll-space" aria-hidden="true"></div>
+
+  <!-- intro / loader -->
+  <div class="intro" id="intro" data-ui>
+    <div class="intro__inner">
+      <svg class="emblem" viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r="46" /><circle cx="60" cy="60" r="38" />
+        <path d="M22 60 Q60 44 98 60M22 60 Q60 76 98 60M60 22 Q44 60 60 98M60 22 Q76 60 60 98" />
+        <path d="M27 46 Q60 38 93 46M27 74 Q60 82 93 74M46 27 Q38 60 46 93M74 27 Q82 60 74 93" />
+      </svg>
+      <p class="kicker">Виртуалды музей</p>
+      <h1 class="intro__title">Әлихан<br>Бөкейхан</h1>
+      <p class="intro__years">1866 — 1937</p>
+      <p class="intro__lead">Алаш көсемінің өмірі, еңбегі және мұрасы — жеті зал, түпнұсқа құжаттар мен фотосуреттер.</p>
+      <div class="intro__bar"><i id="bar"></i></div>
+      <button class="btn btn--gold" id="enter" disabled>Жүктелуде…</button>
+      <p class="intro__hint">Музейді аралау үшін төмен қарай айналдыр</p>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <header class="top" data-ui>
+    <button class="brand" id="home" aria-label="Басына оралу">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="46" /><path d="M22 60 Q60 44 98 60M22 60 Q60 76 98 60M60 22 Q44 60 60 98M60 22 Q76 60 60 98" /></svg>
+      <span><b>Әлихан Бөкейхан</b><small>виртуалды музейі</small></span>
+    </button>
+    <div class="where" id="where" aria-live="polite"></div>
+    <div class="top__actions">
+      <button class="chip" id="btn-halls">Залдар</button>
+      <button class="chip" id="btn-sources">Дереккөздер</button>
+    </div>
+    <div class="progress"><i id="progress"></i></div>
+  </header>
+
+  <nav class="rail" id="rail" data-ui aria-label="Залдар"></nav>
+
+  <div class="lower" id="lower" aria-hidden="true"><span class="lower__num"></span><span class="lower__title"></span><span class="lower__lead"></span></div>
+  <div class="beat" id="beat" aria-live="polite"><span class="beat__big"></span><span class="beat__t"></span><span class="beat__d"></span></div>
+  <button class="more" id="more" data-ui></button>
+  <div class="map" id="map" data-ui></div>
+  <aside class="dock" id="dock" data-ui aria-label="Виртуалды сұхбат"></aside>
+  <section class="card" id="card" data-ui aria-live="polite"></section>
+  <div class="scrollhint" id="scrollhint"><span></span>Айналдыр</div>
+  <div class="tip" id="tip"></div>
+
+  <!-- hall sheet -->
+  <div class="scrim" id="scrim" data-ui></div>
+  <aside class="sheet" id="sheet" data-ui aria-hidden="true" role="dialog" aria-modal="true">
+    <button class="close" id="sheet-close" aria-label="Жабу">✕</button>
+    <div class="sheet__scroll" id="sheet-body"></div>
+  </aside>
+
+  <!-- exhibit lightbox -->
+  <div class="lightbox" id="lightbox" data-ui aria-hidden="true" role="dialog" aria-modal="true">
+    <button class="close" id="lb-close" aria-label="Жабу">✕</button>
+    <div class="lightbox__inner" id="lb-body"></div>
+  </div>
+
+  <!-- halls menu -->
+  <div class="menu" id="menu" data-ui aria-hidden="true"></div>
+
+  <noscript><p style="padding:2rem;color:#f1e7d3">Музейді көру үшін JavaScript қосулы болуы керек.</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
