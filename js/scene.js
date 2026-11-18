@@ -21,6 +21,9 @@ const hallMid = (i) => -ROT.half - (i - 0.5) * HALL.L;      // i = 1..7
 const portalZ = (i) => -ROT.half - i * HALL.L;               // i = 0..7
 const END_Z = portalZ(7);
 
+// quality knobs set once per page by createMuseum (ultra-light mode shrinks generated textures)
+const CFG = { text: 1, lm: 1024 };
+
 // ---- small canvas helpers --------------------------------------------------------------
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 function canvasTex(c, srgb = true) {
@@ -49,7 +52,7 @@ function rayTexture() {
 }
 // Painted "wall washer" light: black base with warm scallops, used as an additive lightMap.
 function wallLightmap(aspect, spots, wash = 0.16) {
-  const W = 1024, H = Math.max(64, Math.round(W / aspect));
+  const W = CFG.lm, H = Math.max(64, Math.round(W / aspect));
   const c = canvas(W, H), x = c.getContext('2d');
   x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
   x.globalCompositeOperation = 'lighter';
@@ -73,7 +76,9 @@ function brass(x, y0, y1) {
   return g;
 }
 // Multi-line text on a transparent canvas. lines: [{t, size, font, weight, color, ls, italic, gap}]
-function textTexture(lines, { width = 1024, pad = 24, align = 'center', bg = null, plate = false } = {}) {
+function textTexture(lines0, { width: width0 = 1024, pad: pad0 = 24, align = 'center', bg = null, plate = false } = {}) {
+  const S = CFG.text, width = Math.round(width0 * S), pad = pad0 * S;       // everything scales together in ultra-light mode
+  const lines = S === 1 ? lines0 : lines0.map((l) => ({ ...l, size: l.size * S, ls: (l.ls ?? 0) * S, gap: (l.gap ?? 0) * S }));
   const probe = canvas(8, 8).getContext('2d');
   const laid = [];
   let h = pad;
@@ -140,9 +145,10 @@ function posterTexture(p) {
 }
 
 // ----------------------------------------------------------------------------------------
-export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lowPower = false }) {
+export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lowPower = false, lite = false }) {
+  if (lite) { lowPower = true; CFG.text = 0.55; CFG.lm = 384; }
   const renderer = new THREE.WebGLRenderer({ canvas: dom, antialias: false, powerPreference: 'high-performance' });
-  const maxDpr = lowPower ? 1.25 : 1.5;
+  const maxDpr = lite ? 1 : lowPower ? 1.25 : 1.5;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
   renderer.setSize(window.innerWidth || 1280, window.innerHeight || 720, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -162,11 +168,12 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
   let loaded = 0, total = 0;
   const loader = new THREE.TextureLoader();
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  const load = (url, { srgb = true, wrap = false } = {}) => {
+  const load = (url0, { srgb = true, wrap = false } = {}) => {
+    const url = lite ? url0.replace(/^assets\/(archive|gen)\//, 'assets/lite/$1/') : url0;      // smaller copies for weak machines
     total++;
     return new Promise((res) => loader.load(url, (t) => {
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = Math.min(8, maxAniso);
+      t.anisotropy = lite ? 1 : Math.min(8, maxAniso);
       if (wrap) t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
       loaded++; onLoad?.(loaded / total); res(t);
     }, undefined, () => { console.warn('texture failed', url); loaded++; onLoad?.(loaded / total); res(null); }));
@@ -255,7 +262,7 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
     }
     return grp;
   }
-  function glow(w, h, opacity = 0.35) { return new THREE.Mesh(new THREE.PlaneGeometry(w, h), additive(GLOW, opacity)); }
+  function glow(w, h, opacity = 0.35) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), additive(GLOW, opacity)); if (lite) m.visible = false; return m; }
 
   // Framed picture. Built facing +Z, origin at picture centre on the wall plane.
   function frame({ tex, id, hall, maxH = 2.5, maxW = 3.5, label, sub, big = false, poster = false }) {
@@ -273,7 +280,7 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
     pic.position.z = (big || poster) ? 0.13 : 0.152; g.add(pic);
     if (id) { pic.userData = { kind: poster ? 'open' : 'exhibit', id, hall, label }; pickables.push(pic); }
     const halo = glow(ow * 1.9, oh * 1.7, big ? 0.16 : 0.24); halo.position.set(0, oh * 0.12, 0.02); g.add(halo);
-    { // brass picture light above the frame
+    if (!lite) { // brass picture light above the frame
       const ly = oh / 2 + 0.2, bw = Math.min(ow * 0.62, 5.2);
       const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, bw, 10), M.brass); bar.rotation.z = Math.PI / 2; bar.position.set(0, ly, 0.38); g.add(bar);
       for (const sx of big ? [-1, 1] : [0]) { const stem = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.38), M.brass); stem.position.set(sx * bw * 0.3, ly, 0.19); g.add(stem); }
@@ -323,7 +330,7 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
       const cap = new THREE.Mesh(new THREE.BoxGeometry(len, 0.07, 0.13), M.brass); cap.position.set(0, DADO + 0.035, 0.065); k.add(cap);
       const plinth = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, 0.15), M.basalt); plinth.position.set(0, 0.1, 0.075); k.add(plinth);
     }
-    if (cornice) {
+    if (cornice && !lite) {
       const c1 = new THREE.Mesh(new THREE.BoxGeometry(len, 0.4, 0.36), M.stoneDark); c1.position.set(0, H - 0.2, 0.18); k.add(c1);
       const c2 = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, 0.2), M.brass); c2.position.set(0, H - 0.44, 0.1); k.add(c2);
     }
@@ -331,7 +338,7 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
   }
   const sconceG = { plate: new THREE.BoxGeometry(0.18, 0.56, 0.05), arm: new THREE.BoxGeometry(0.05, 0.05, 0.26), globe: new THREE.SphereGeometry(0.13, 18, 12), cup: new THREE.CylinderGeometry(0.09, 0.05, 0.1, 14) };
   function sconce(parent, x, y, z = 0) {         // brass wall lamp with a soft wash on the wall
-    const s = new THREE.Group();
+    const s = new THREE.Group(); if (lite) return s;
     const pl = new THREE.Mesh(sconceG.plate, M.brass); pl.position.z = 0.025; s.add(pl);
     const ar = new THREE.Mesh(sconceG.arm, M.brass); ar.position.set(0, 0.06, 0.15); s.add(ar);
     const cu = new THREE.Mesh(sconceG.cup, M.brass); cu.position.set(0, 0.12, 0.27); s.add(cu);
@@ -340,12 +347,14 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
     s.position.set(x, y, z); parent.add(s); return s;
   }
   function roundel(parent, x, y, r = 1.2, z = 0.04) {  // carved ornament rosette in a brass ring
+    if (lite) return;
     const d = new THREE.Mesh(new THREE.CircleGeometry(r, 64), roundelMat); d.position.set(x, y, z); parent.add(d);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.06, 8, 64), M.brass); ring.position.set(x, y, z + 0.02); parent.add(ring);
     const g2 = glow(r * 4.4, r * 4.4, 0.2); g2.position.set(x, y + r * 0.3, z - 0.02); parent.add(g2);
   }
   const ringG = new THREE.TorusGeometry(1.25, 0.055, 10, 72), bandG2 = new THREE.TorusGeometry(1.19, 0.028, 8, 72);
   function chandelier(parent, x, y, z, H) {      // brass ring pendant with a glowing inner band
+    if (lite) return;
     const c = new THREE.Group();
     const ring = new THREE.Mesh(ringG, M.brass); ring.rotation.x = Math.PI / 2; c.add(ring);
     const band = new THREE.Mesh(bandG2, warmMat); band.rotation.x = Math.PI / 2; band.position.y = -0.05; c.add(band);
@@ -358,6 +367,7 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
   }
   const postG = new THREE.LatheGeometry([[0, 0], [0.17, 0], [0.17, 0.035], [0.045, 0.07], [0.035, 0.9], [0.065, 0.93], [0.065, 0.99], [0, 1.02]].map(([a, b]) => new THREE.Vector2(a, b)), 18);
   function barrier(parent, x, z0, z1, n = 5) {   // brass posts with a velvet rope along local z
+    if (lite) return;
     for (let i = 0; i < n; i++) {
       const z = z0 + (z1 - z0) * i / (n - 1), p = new THREE.Mesh(postG, M.brass); p.position.set(x, 0, z); parent.add(p);
       if (i) {
@@ -367,7 +377,7 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
       }
     }
   }
-  function wallText(parent, lines, worldW, x, y, opts) { const t = textPlane(lines, worldW, opts); t.position.set(x, y, 0.05); parent.add(t); return t; }
+  function wallText(parent, lines, worldW, x, y, opts) { if (lite) return null; const t = textPlane(lines, worldW, opts); t.position.set(x, y, 0.05); parent.add(t); return t; }
 
   // ---- rotunda --------------------------------------------------------------------------
   {
@@ -840,9 +850,9 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
   });
 
   // ---- lights: low ambient, warm fill travelling with the visitor -------------------------
-  scene.add(new THREE.HemisphereLight(0xffe9cc, 0x2a1f18, 0.36));
+  scene.add(new THREE.HemisphereLight(0xffe9cc, 0x2a1f18, lite ? 0.62 : 0.36));
   const sunL = new THREE.DirectionalLight(0xffdcae, 0.28); sunL.position.set(-3, 12, 4); scene.add(sunL);
-  const lamp = new THREE.PointLight(0xffdcb0, 7, 18, 1.4); scene.add(lamp);
+  const lamp = new THREE.PointLight(0xffdcb0, 7, 18, 1.4); if (!lite) scene.add(lamp);      // no per-pixel point light on weak GPUs
 
   // ---- camera path ----------------------------------------------------------------------
   const posCurve = new THREE.CatmullRomCurve3(keys.map((k) => k.p), false, 'catmullrom', 0.5);
@@ -853,12 +863,18 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
 
   // ---- post -----------------------------------------------------------------------------
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const rt = new THREE.WebGLRenderTarget(Math.max(2, size.x), Math.max(2, size.y), { type: THREE.HalfFloatType, samples: lowPower ? 0 : 4 });
-  const composer = new EffectComposer(renderer, rt);
-  composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(Math.max(2, size.x / 2), Math.max(2, size.y / 2)), 0.16, 0.6, 1.0);
-  composer.addPass(bloom);
-  const grade = new ShaderPass({
+  let composer, bloom, grade;
+  if (lite) {                                              // ultra-light: straight to the screen, no bloom or grading passes
+    root.traverse((o) => { if (o.isMesh && o.material?.blending === THREE.AdditiveBlending) o.visible = false; });   // light shafts and glows off
+    composer = { render: () => renderer.render(scene, camera), setSize() {} };
+    bloom = { strength: 0 }; grade = { uniforms: { uTime: { value: 0 }, uFade: { value: 0 } } };
+  } else {
+    const rt = new THREE.WebGLRenderTarget(Math.max(2, size.x), Math.max(2, size.y), { type: THREE.HalfFloatType, samples: lowPower ? 0 : 4 });
+    composer = new EffectComposer(renderer, rt);
+    composer.addPass(new RenderPass(scene, camera));
+    bloom = new UnrealBloomPass(new THREE.Vector2(Math.max(2, size.x / 2), Math.max(2, size.y / 2)), 0.16, 0.6, 1.0);
+    composer.addPass(bloom);
+    grade = new ShaderPass({
     uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uFade: { value: 0 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uFade; varying vec2 vUv;
@@ -868,8 +884,9 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
         c.rgb += (h(vUv*vec2(1920.0,1080.0)+uTime)-0.5)*0.014;
         c.rgb = mix(c.rgb, vec3(1.0,0.96,0.9), uFade); gl_FragColor = c; }`,
   });
-  composer.addPass(grade);
-  composer.addPass(new OutputPass());
+    composer.addPass(grade);
+    composer.addPass(new OutputPass());
+  }
 
   // ---- state ----------------------------------------------------------------------------
   const state = { target: 0, cur: 0, mx: 0, my: 0, smx: 0, smy: 0, hover: null, running: true, focus: null };
@@ -919,9 +936,10 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
   function cull(kf) {
     const k0 = keys[Math.max(0, Math.min(keys.length - 1, Math.floor(kf)))], k1 = keys[Math.min(keys.length - 1, Math.floor(kf) + 1)];
     for (const lv of [0, 1]) if (reflectors[lv]) reflectors[lv].visible = quality > 0 && (k0.lvs.has(lv) || k1.lvs.has(lv));
-    for (let i = 0; i < mods.length; i++) mods[i].g.visible = Math.abs(i - k0.mi) <= 2 || Math.abs(i - k1.mi) <= 2;
+    const reach = lite ? 1 : 2;
+    for (let i = 0; i < mods.length; i++) mods[i].g.visible = Math.abs(i - k0.mi) <= reach || Math.abs(i - k1.mi) <= reach;
   }
-  let quality = 2, slow = 0;                               // 2 = full, 1 = lower resolution, 0 = no mirrors
+  let quality = lite ? 0 : 2, slow = 0;                               // 2 = full, 1 = lower resolution, 0 = no mirrors
   function degrade() {
     quality--;
     if (quality === 1) { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.1)); bloom.strength = 0.14; }

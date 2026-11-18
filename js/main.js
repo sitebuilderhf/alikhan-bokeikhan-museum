@@ -9,8 +9,10 @@ const intro = $('intro'), enterBtn = $('enter'), bar = $('bar');
 const where = $('where'), card = $('card'), lower = $('lower'), beat = $('beat'), more = $('more'), map = $('map');
 const dock = $('dock'), tip = $('tip'), rail = $('rail'), menu = $('menu'), space = $('scroll-space');
 
-const quality = new URLSearchParams(location.search).get('q');          // ?q=high | ?q=low overrides the automatic choice
-const lowPower = quality ? quality === 'low' : matchMedia('(max-width: 820px)').matches || (navigator.hardwareConcurrency || 8) <= 4;
+const quality = new URLSearchParams(location.search).get('q');          // ?q=high | ?q=low | ?q=lite overrides the automatic choice
+// lite = ultra-light mode for old laptops (4 GB of memory, basic graphics): small images, no lamps, glows or post-processing
+const lite = quality ? quality === 'lite' : (navigator.deviceMemory || 8) <= 4 && (navigator.hardwareConcurrency || 8) <= 4;
+const lowPower = lite || (quality ? quality === 'low' : matchMedia('(max-width: 820px)').matches || (navigator.hardwareConcurrency || 8) <= 4);
 const SEG_VH = 0.62;                                  // scroll distance per camera stop, in viewport heights
 const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;
 
@@ -23,7 +25,7 @@ async function boot() {
 
   let museum;
   try {
-    museum = await createMuseum({ canvas: $('gl'), halls: HALLS, hero: HERO, texts: TEXTS, lowPower, onLoad: (p) => { bar.style.width = `${Math.round(p * 100)}%`; } });
+    museum = await createMuseum({ canvas: $('gl'), halls: HALLS, hero: HERO, texts: TEXTS, lowPower, lite, onLoad: (p) => { bar.style.width = `${Math.round(p * 100)}%`; } });
   } catch (err) {
     console.error(err);
     enterBtn.textContent = '3D көрініс іске қосылмады';
@@ -187,6 +189,10 @@ async function boot() {
   document.addEventListener('visibilitychange', () => museum?.setPaused(document.hidden || ui.busy));
 
   // ---- start ----
+  { // let the visitor switch between the full and the light version from the first screen
+    const sw = $('mode'), u = new URL(location.href); u.searchParams.set('q', lite ? 'high' : 'lite'); u.searchParams.delete('skipintro');
+    sw.href = u.pathname + u.search; sw.textContent = lite ? 'Жеңіл нұсқа қосулы · толық нұсқаға өту' : 'Баяу жұмыс істесе — жеңіл нұсқаны ашу';
+  }
   museum?.start();
   window.scrollTo(0, 0);
   enterBtn.disabled = false; enterBtn.textContent = 'Музейге кіру';
