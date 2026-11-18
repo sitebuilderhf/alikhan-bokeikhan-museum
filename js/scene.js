@@ -968,6 +968,19 @@ export async function createMuseum({ canvas: dom, halls, hero, texts, onLoad, lo
     renderOnce() { cull(state.cur * (keys.length - 1)); place(state.cur); composer.render(0.016); },
     renderFrom(p, t) { camera.position.set(...p); camera.lookAt(...t); composer.render(0.016); },
     get quality() { return quality; },
+    lowerQuality() { if (quality > 0) degrade(); return quality; },
+    // Real cost of a frame in milliseconds (GPU included), measured synchronously at two busy viewpoints.
+    // Independent of requestAnimationFrame, so a throttled background tab does not distort it.
+    bench(frames = 6) {
+      const gl = renderer.getContext(); let total = 0, n = 0;
+      for (const kf of [1, 10]) {
+        const u = kf / (keys.length - 1); cull(kf); place(u); composer.render(0.016); gl.finish();      // warm-up: shaders, texture uploads
+        const t0 = performance.now(); for (let i = 0; i < frames; i++) { composer.render(0.016); gl.finish(); }
+        total += performance.now() - t0; n += frames;
+      }
+      cull(state.cur * (keys.length - 1)); place(state.cur);
+      return total / n;
+    },
     debug: { scene, camera, renderer },
   };
 }

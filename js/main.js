@@ -9,10 +9,31 @@ const intro = $('intro'), enterBtn = $('enter'), bar = $('bar');
 const where = $('where'), card = $('card'), lower = $('lower'), beat = $('beat'), more = $('more'), map = $('map');
 const dock = $('dock'), tip = $('tip'), rail = $('rail'), menu = $('menu'), space = $('scroll-space');
 
-const quality = new URLSearchParams(location.search).get('q');          // ?q=high | ?q=low | ?q=lite overrides the automatic choice
-// lite = ultra-light mode for old laptops (4 GB of memory, basic graphics): small images, no lamps, glows or post-processing
-const lite = quality ? quality === 'lite' : (navigator.deviceMemory || 8) <= 4 && (navigator.hardwareConcurrency || 8) <= 4;
-const lowPower = lite || (quality ? quality === 'low' : matchMedia('(max-width: 820px)').matches || (navigator.hardwareConcurrency || 8) <= 4);
+// ---- which version to run -------------------------------------------------------------------
+// high = everything; low = no floor mirrors, lower resolution; lite = ultra-light for old laptops
+// (small images, no lamps, glows or post-processing). Order of authority:
+//   1. ?q=high|low|lite in the address (manual choice)   2. what a speed test decided on an earlier visit
+//   3. a guess from the hardware, which the speed test then confirms or corrects (see boot()).
+const MODES = ['lite', 'low', 'high'];
+const forced = MODES.includes(new URLSearchParams(location.search).get('q')) ? new URLSearchParams(location.search).get('q') : null;
+const remembered = (() => { try { const v = JSON.parse(localStorage.getItem('abm:mode') || 'null'); return v && MODES.includes(v.mode) && Date.now() - v.t < 30 * 864e5 ? v.mode : null; } catch { return null; } })();
+function guessMode() {
+  const mem = navigator.deviceMemory || 8, cores = navigator.hardwareConcurrency || 8;
+  let gpu = '';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info'); gpu = String((ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || gl?.getParameter(gl.RENDERER) || '');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  } catch { /* no WebGL info: fall back to memory and cores */ }
+  const software = /swiftshader|llvmpipe|software|basic render/i.test(gpu);
+  const weakGpu = /intel[^,]*\b(hd|uhd) graphics|\bgma\b|mali-[4t]|adreno \(tm\) [2-5]\d\d|powervr|geforce (gt |gtx |)?[2-7]\d\dm?\b|radeon (hd|r[2-5])\b/i.test(gpu);
+  if (software || (mem <= 4 && cores <= 4) || (weakGpu && (mem <= 4 || cores <= 2))) return 'lite';
+  if (weakGpu || cores <= 4 || matchMedia('(max-width: 820px)').matches) return 'low';
+  return 'high';
+}
+const mode = forced || remembered || guessMode();
+const lite = mode === 'lite', lowPower = mode !== 'high';
+const remember = (m) => { try { localStorage.setItem('abm:mode', JSON.stringify({ mode: m, t: Date.now() })); } catch { /* private window */ } };
 const SEG_VH = 0.62;                                  // scroll distance per camera stop, in viewport heights
 const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;
 
@@ -31,6 +52,24 @@ async function boot() {
     enterBtn.textContent = '3D көрініс іске қосылмады';
     intro.querySelector('.intro__hint').textContent = 'Браузеріңде WebGL қосулы екенін тексер немесе залдарды мәзір арқылы аш.';
     museum = null;
+  }
+  // Speed test: measure what a frame really costs on this machine and correct the guess.
+  // Too slow -> reload once into the ultra-light version; a bit slow -> drop mirrors/resolution on the spot;
+  // an ultra-light start on a machine that turns out to be fast -> step up. The result is remembered for next time.
+  let verdict = mode;
+  if (museum && !forced) {
+    let switched = false; try { switched = sessionStorage.getItem('abm:switched') === '1'; } catch { /* ignore */ }
+    const ms = Number(new URLSearchParams(location.search).get('bench')) || museum.bench();     // ?bench=<ms> fakes the result, for testing the switch
+    if (!lite && ms > 40) verdict = 'lite';
+    else if (lite && ms < 1.5 && !remembered) verdict = 'low';
+    else if (mode === 'high' && ms > 18) { museum.lowerQuality(); if (ms > 28) museum.lowerQuality(); verdict = 'low'; }
+    else if (mode === 'low' && ms > 26) museum.lowerQuality();
+    remember(verdict);
+    if ((verdict === 'lite') !== lite && !switched) {                 // needs a different build of the scene: reload once
+      try { sessionStorage.setItem('abm:switched', '1'); } catch { /* ignore */ }
+      enterBtn.textContent = verdict === 'lite' ? 'Жеңіл нұсқа қосылуда…' : 'Жүктелуде…';
+      location.reload(); return;
+    }
   }
   const ui = createUI({ onClose: () => museum?.setPaused(ui?.busy) });
   window.__museum = museum; window.__ui = ui;                 // handy in the console for debugging
@@ -191,7 +230,8 @@ async function boot() {
   // ---- start ----
   { // let the visitor switch between the full and the light version from the first screen
     const sw = $('mode'), u = new URL(location.href); u.searchParams.set('q', lite ? 'high' : 'lite'); u.searchParams.delete('skipintro');
-    sw.href = u.pathname + u.search; sw.textContent = lite ? 'Жеңіл нұсқа қосулы · толық нұсқаға өту' : 'Баяу жұмыс істесе — жеңіл нұсқаны ашу';
+    const label = lite ? 'жеңіл нұсқа' : verdict === 'low' || lowPower ? 'орташа сапа' : 'толық сапа';
+    sw.href = u.pathname + u.search; sw.textContent = `${forced ? 'Таңдалған' : 'Автоматты таңдалды'}: ${label} · ${lite ? 'толық нұсқаға өту' : 'жеңіл нұсқаны ашу'}`;
   }
   museum?.start();
   window.scrollTo(0, 0);
